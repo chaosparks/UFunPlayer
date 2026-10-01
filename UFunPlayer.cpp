@@ -26,6 +26,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <wchar.h>
+#include <wctype.h>
 #include <stdlib.h>
 
 #include "resource.h"
@@ -287,7 +288,7 @@ INT_PTR CALLBACK DownloadDlgProc(HWND,UINT,WPARAM,LPARAM);
 INT_PTR CALLBACK ToolsWarningDlgProc(HWND,UINT,WPARAM,LPARAM);
 INT_PTR CALLBACK ExperimentalDlgProc(HWND,UINT,WPARAM,LPARAM);
 static void UnityDestroy();
-static bool UnityCreate(HWND,const wchar_t*);
+static bool UnityCreate(HWND,const wchar_t*,const wchar_t*);
 static void UnityResize(int,int);
 static void LoadFileOrUrl(const wchar_t*,const wchar_t*refererArg=nullptr);
 static void ParseCmdArg(const wchar_t* arg,wchar_t* outGame,size_t gameCap,wchar_t* outRef,size_t refCap);
@@ -542,7 +543,47 @@ static void UnityEncodeFilename(const wchar_t* widePath, wchar_t* out, int outLe
     if(dst+4<out+outLen){wcscpy(dst,L".upp");}
 }
 
-static bool CheckAndWarnSavePath(const wchar_t* gamePath)
+static bool MakeShortSavePathAlias(const wchar_t* gamePath, wchar_t* alias, size_t aliasCap)
+{
+    wchar_t temp[MAX_PATH] = { 0 };
+    DWORD n = GetTempPathW(_countof(temp), temp);
+    if (!n || n >= _countof(temp)) return false;
+
+    // Use a stable ASCII alias so the same game keeps the same PlayerPrefs
+    // identity across launches. FNV-1a is sufficient here; this is a filename
+    // key, not a security boundary.
+    ULONGLONG hash = 14695981039346656037ULL;
+    for (const wchar_t* p = gamePath; *p; ++p) {
+        wchar_t c = (wchar_t)towlower(*p);
+        hash ^= (unsigned short)c;
+        hash *= 1099511628211ULL;
+    }
+
+    wchar_t dir[MAX_PATH] = { 0 };
+    _snwprintf(dir, _countof(dir)-1, L"%sUFunPlayer", temp);
+    dir[_countof(dir)-1] = L'\0';
+    if (!CreateDirectoryW(dir, nullptr) && GetLastError() != ERROR_ALREADY_EXISTS)
+        return false;
+
+    wchar_t name[32] = { 0 };
+    _snwprintf(name, _countof(name)-1, L"%016llx.unity3d", hash);
+    name[_countof(name)-1] = L'\0';
+    if (_snwprintf(alias, aliasCap-1, L"%s\\%s", dir, name) < 0) return false;
+    alias[aliasCap-1] = L'\0';
+
+    // A hard link avoids duplicating large bundles. If the source is on a
+    // different volume (or hard links are unavailable), fall back to a copy.
+    if (GetFileAttributesW(alias) != INVALID_FILE_ATTRIBUTES) {
+        // Reuse an existing alias when Unity still has the file open and
+        // Windows therefore will not let us replace it.
+        if (!DeleteFileW(alias)) return true;
+    }
+    if (!CreateHardLinkW(alias, gamePath, nullptr) && !CopyFileW(gamePath, alias, FALSE))
+        return false;
+    return true;
+}
+
+static bool CheckAndWarnSavePath(const wchar_t* gamePath, wchar_t* shortAlias, size_t aliasCap)
 {
     if(PathIsURL(gamePath))return true;
 
@@ -564,6 +605,18 @@ static bool CheckAndWarnSavePath(const wchar_t* gamePath)
 
     int totalLen=(int)wcslen(fullPath);
     if(totalLen<=MAX_PATH)return true;
+
+    if (shortAlias && aliasCap > 1 && MakeShortSavePathAlias(gamePath, shortAlias, aliasCap)) {
+        wchar_t aliasEncoded[MAX_PATH*40] = { 0 };
+        UnityEncodeFilename(shortAlias, aliasEncoded, _countof(aliasEncoded));
+        wchar_t aliasFull[MAX_PATH*42] = { 0 };
+        _snwprintf(aliasFull, _countof(aliasFull)-1,
+                   L"%s\\Unity\\WebPlayerPrefs\\localhost\\%s", appData, aliasEncoded);
+        aliasFull[_countof(aliasFull)-1] = L'\0';
+        if (wcslen(aliasFull) <= MAX_PATH) return true;
+        DeleteFileW(shortAlias);
+        shortAlias[0] = L'\0';
+    }
 
     wchar_t dispPath[512]={};
     if(totalLen<=480){
@@ -1469,7 +1522,7 @@ static void UnityDestroy(){
     CoFreeUnusedLibrariesEx(0,0);
     if(g_hwndMain)InvalidateRect(g_hwndMain,nullptr,TRUE);
 }
-static bool UnityCreate(HWND hwnd,const wchar_t*srcUrl){
+static bool UnityCreate(HWND hwnd,const wchar_t*srcUrl,const wchar_t*baseUrl){
     // Local path -> file:// URL: the WWW class resolves relative bundle paths
     // against this base URL (multi-bundle games).
     wchar_t fileUrl[MAX_PATH*2]={};
@@ -1486,11 +1539,22 @@ static bool UnityCreate(HWND hwnd,const wchar_t*srcUrl){
         fileUrl[(MAX_PATH*2)-1]=L'\0';
     }
 
-    // Store for OCX URL-resolve hook fallback (multi-bundle games).
-    wcsncpy(g_gameFileUrl,fileUrl,_countof(g_gameFileUrl)-1);
+    // Keep relative downloads anchored to the original game directory even
+    // when srcUrl is a short temporary alias used for PlayerPrefs.
+    wchar_t baseFileUrl[MAX_PATH * 2] = { 0 };
+    if (PathIsURL(baseUrl) == TRUE) {
+        wcsncpy(baseFileUrl, baseUrl, _countof(baseFileUrl)-1);
+    } else {
+        wcscpy(baseFileUrl, L"file:///");
+        size_t basePos = 8;
+        for (const wchar_t* p = baseUrl; *p && basePos < _countof(baseFileUrl)-1; ++p)
+            baseFileUrl[basePos++] = (*p == L'\\') ? L'/' : *p;
+    }
+    baseFileUrl[_countof(baseFileUrl)-1] = L'\0';
+    wcsncpy(g_gameFileUrl,baseFileUrl,_countof(g_gameFileUrl)-1);
     g_gameFileUrl[_countof(g_gameFileUrl)-1]=L'\0';
 
-    g_pSite=new UnityClientSite(hwnd,fileUrl);
+    g_pSite=new UnityClientSite(hwnd,baseFileUrl);
     HRESULT hr=CoCreateInstance(CLSID_UnityWebPlayer,nullptr,CLSCTX_INPROC_SERVER,
                                 IID_IOleObject,(void**)&g_pOleObj);
     if(FAILED(hr)){g_pSite->Release();g_pSite=nullptr;return false;}
@@ -2514,7 +2578,8 @@ static void LoadFileOrUrl(const wchar_t*pathArg,const wchar_t*refererArg)
         g_currentReferer[(sizeof(g_currentReferer)/sizeof(wchar_t))-1]=L'\0';
     }
 
-    if(!CheckAndWarnSavePath(path))return;
+    wchar_t shortAlias[MAX_PATH] = { 0 };
+    if(!CheckAndWarnSavePath(path,shortAlias,_countof(shortAlias)))return;
 
     SetStatus(LS("STATUS_LOADING"));UpdateWindow(g_hwndMain);
 
@@ -2545,7 +2610,8 @@ static void LoadFileOrUrl(const wchar_t*pathArg,const wchar_t*refererArg)
     // anti-piracy checks pass. URL games are left untouched.
     BuildSpoofedUrl(path,refSnap);
 
-    if(!UnityCreate(g_hwndMain,path)){
+    const wchar_t* unityPath = shortAlias[0] ? shortAlias : path;
+    if(!UnityCreate(g_hwndMain,unityPath,path)){
         SetStatus(LS("STATUS_CREATE_FAILED"));
         g_currentPath[0]=L'\0';
         return;
