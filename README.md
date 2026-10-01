@@ -114,3 +114,47 @@ A companion browser extension automates this on supported game pages. Source cod
 
 Licensed under the GNU General Public License v3.0.
 The full license text is in the [LICENSE](LICENSE) file.
+
+## Extra 
+
+![img](img/1.png) 
+
+![img](img/2.png)
+
+This repo forked from [mtdcmz/UFunPlayer](https://github.com/mtdcmz/UFunPlayer). 
+
+### Bug fixed
+- unity 5+ will load from mono\5.xx && player\5.xx, and other versions will load from mono\3.xx && player\3.xx
+- fix 'Warning: Save data (PlayerPrefs) will NOT work!', make hash for Chinese folder path or long path of .unity3d file
+
+### Offline Web Player installers
+
+[Offline Web Player installers download](https://discussions.unity.com/t/offline-web-player-installers/605216)
+
+With the recent announcement to deprecate the web player we’ve also decided to no longer couple the offline web player with the simulation license it was made for initially.
+
+The installers are available freely at the following links:
+
+- 5.3.x: http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.3.1f1.zip + http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.3.2f1.zip + http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.3.3f1.zip + http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.3.4f1.zip +
+
+http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.3.5f1.zip+ http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.3.6f1.zip +
+http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.3.7f1.zip + http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.3.8f1.zip + http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.3.8f2.zip
+
+- 5.2.x: http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.2.4f1.zip
+
+- 5.0 to 5.1.4: http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_5.1.4f1.zip
+
+- 3.x to 4.7.2: http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_4.7.0f1.zip + http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_4.7.1f1.zip +
+
+http://files.unity3d.com/stefan/webplayer/webplayer_archive/ClosedNetworkPlayer_4.7.2f1.zip
+
+The zip archives contain the following installers:
+
+UnityWebPlayerFull.exe: Normal player which runs in Windows Firefox and IE (both 32bit).
+UnityWebPlayerDevelopment.exe: Development player which runs in Windows Firefox and IE (both 32bit).
+webplayer-x86_64.dmg: Normal player which runs on OSX Firefox and Safari.
+These players come with a runtime packaged and don’t need an internet connection to start or run content. They are however limited to this one runtime which has some compatibility implications as listed above.
+
+For example if you have the 4.6.9 player installed you can only run 3.x-4.6.9 content with it. It will not play anything made with 5.0.x or 5.1.x or 5.2.x.
+
+Hope they are of use to you.
