@@ -702,9 +702,13 @@ static bool SwitchRuntime(int major,int minor){
     wchar_t userProfile[MAX_PATH];
     ExpandEnvironmentStrings(L"%USERPROFILE%",userProfile,MAX_PATH);
     wchar_t wpBase[MAX_PATH];_snwprintf(wpBase,MAX_PATH-1,L"%s\\AppData\\LocalLow\\Unity\\WebPlayer",userProfile);wpBase[MAX_PATH-1]=0;
-    wchar_t monoDst[MAX_PATH],playerDst[MAX_PATH];
-    _snwprintf(monoDst,  MAX_PATH-1,L"%s\\mono\\3.x.x",  wpBase);monoDst[MAX_PATH-1]=0;
-    _snwprintf(playerDst,MAX_PATH-1,L"%s\\player\\3.x.x",wpBase);playerDst[MAX_PATH-1]=0;
+    wchar_t monoDst[MAX_PATH] = { 0 }, playerDst[MAX_PATH] = { 0 };
+    // 增加动态判断：如果 major 大于等于 5，使用 5.x.x，否则使用 3.x.x
+    const wchar_t* destVer = (major >= 5) ? L"5.x.x" : L"3.x.x";
+    
+    _snwprintf(monoDst,  MAX_PATH-1,L"%s\\mono\\%s",  wpBase, destVer);monoDst[MAX_PATH-1]=0;
+    _snwprintf(playerDst,MAX_PATH-1,L"%s\\player\\%s",wpBase, destVer);playerDst[MAX_PATH-1]=0;
+	
     DeleteFolderContents(monoDst);  RemoveDirectory(monoDst);
     DeleteFolderContents(playerDst);RemoveDirectory(playerDst);
     CopyFolderContents(monoSrc,monoDst);CopyFolderContents(playerSrc,playerDst);
