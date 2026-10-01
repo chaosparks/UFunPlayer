@@ -744,27 +744,39 @@ static void CopyFolderContents(const wchar_t*src,const wchar_t*dest){
 }
 static bool SwitchRuntime(int major,int minor){
     RuntimeDef def=GetRuntimeDef(major,minor);
-    wchar_t monoSrc[MAX_PATH],playerSrc[MAX_PATH];
+    wchar_t monoSrc[MAX_PATH] = { 0 },playerSrc[MAX_PATH] = { 0 },loaderSrc[MAX_PATH] = { 0 };
     _snwprintf(monoSrc,  MAX_PATH-1,L"%s\\Runtime\\mono\\%s",  g_exeDir,def.folder);monoSrc[MAX_PATH-1]=0;
     _snwprintf(playerSrc,MAX_PATH-1,L"%s\\Runtime\\player\\%s",g_exeDir,def.folder);playerSrc[MAX_PATH-1]=0;
-    if(!PathFileExists(monoSrc)||!PathFileExists(playerSrc)){
-        wchar_t msg[600];
-        _snwprintf(msg,599,LS("MSG_RUNTIME_SWITCH_FAILED_BODY"),def.channel,monoSrc);msg[599]=0;
+    const wchar_t* loaderVersion = (major >= 5) ? L"5.x.x" : L"3.x.x";
+    _snwprintf(loaderSrc,MAX_PATH-1,L"%s\\Runtime\\loader\\%s",g_exeDir,loaderVersion);loaderSrc[MAX_PATH-1]=0;
+    if(!PathFileExists(monoSrc)||!PathFileExists(playerSrc)||!PathFileExists(loaderSrc)){
+        wchar_t msg[600] = { 0 };
+        const wchar_t* missingPath = !PathFileExists(monoSrc) ? monoSrc :
+                                     (!PathFileExists(playerSrc) ? playerSrc : loaderSrc);
+        _snwprintf(msg,599,LS("MSG_RUNTIME_SWITCH_FAILED_BODY"),def.channel,missingPath);msg[599]=0;
         MessageBox(g_hwndMain,msg,LS("MSG_RUNTIME_SWITCH_FAILED_TITLE"),MB_ICONWARNING);return false;
     }
-    wchar_t userProfile[MAX_PATH];
+    wchar_t userProfile[MAX_PATH] = { 0 };
     ExpandEnvironmentStrings(L"%USERPROFILE%",userProfile,MAX_PATH);
-    wchar_t wpBase[MAX_PATH];_snwprintf(wpBase,MAX_PATH-1,L"%s\\AppData\\LocalLow\\Unity\\WebPlayer",userProfile);wpBase[MAX_PATH-1]=0;
+    wchar_t wpBase[MAX_PATH] = { 0 };_snwprintf(wpBase,MAX_PATH-1,L"%s\\AppData\\LocalLow\\Unity\\WebPlayer",userProfile);wpBase[MAX_PATH-1]=0;
     wchar_t monoDst[MAX_PATH] = { 0 }, playerDst[MAX_PATH] = { 0 };
-    // 增加动态判断：如果 major 大于等于 5，使用 5.x.x，否则使用 3.x.x
-    const wchar_t* destVer = (major >= 5) ? L"5.x.x" : L"3.x.x";
+    const wchar_t* destVer = loaderVersion;
     
     _snwprintf(monoDst,  MAX_PATH-1,L"%s\\mono\\%s",  wpBase, destVer);monoDst[MAX_PATH-1]=0;
     _snwprintf(playerDst,MAX_PATH-1,L"%s\\player\\%s",wpBase, destVer);playerDst[MAX_PATH-1]=0;
+
+    wchar_t loaderDst[MAX_PATH] = { 0 };
+    _snwprintf(loaderDst,MAX_PATH-1,L"%s\\loader",wpBase);loaderDst[MAX_PATH-1]=0;
 	
     DeleteFolderContents(monoDst);  RemoveDirectory(monoDst);
     DeleteFolderContents(playerDst);RemoveDirectory(playerDst);
     CopyFolderContents(monoSrc,monoDst);CopyFolderContents(playerSrc,playerDst);
+
+    // Loader files live directly in WebPlayer\\loader, unlike mono/player
+    // which are placed beneath versioned subdirectories.
+    DeleteFolderContents(loaderDst);
+    RemoveDirectory(loaderDst);
+    CopyFolderContents(loaderSrc,loaderDst);
     HKEY hk=nullptr;
     if(RegCreateKeyEx(HKEY_CURRENT_USER,L"Software\\Unity\\WebPlayer",
             0,nullptr,0,KEY_WRITE,nullptr,&hk,nullptr)==ERROR_SUCCESS){

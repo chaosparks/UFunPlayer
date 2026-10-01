@@ -115,6 +115,8 @@ A companion browser extension automates this on supported game pages. Source cod
 Licensed under the GNU General Public License v3.0.
 The full license text is in the [LICENSE](LICENSE) file.
 
+##
+
 ## Extra 
 
 ![img](img/1.png) 
@@ -126,6 +128,27 @@ This repo forked from [mtdcmz/UFunPlayer](https://github.com/mtdcmz/UFunPlayer).
 ### Bug fixed
 - unity 5+ will load from mono\5.xx && player\5.xx, and other versions will load from mono\3.xx && player\3.xx
 - fix 'Warning: Save data (PlayerPrefs) will NOT work!', make hash for Chinese folder path or long path of .unity3d file
+- overwrite `%USERPROFILE%\AppData\LocalLow\Unity\WebPlayer\loader` based on 3.xx or 5.xx
+
+### ReBuild UFunPlayer.exe
+
+- 安装 MINGW32 环境 [MSYS2](https://www.msys2.org/)
+- 打开 MSYS2 MINGW32 终端, Win + R , `D:/msys64` 是 MINGW32 的安装目录
+```
+D:/msys64/msys2_shell.cmd -mingw32
+```
+- 在 MINGW32 终端安装构建工具
+```
+pacman -S mingw-w64-i686-toolchain mingw-w64-i686-make
+```
+- 回到项目目录，清掉主程序和 MinHook 之前可能生成的目标文件，再构建
+```
+cd /e/github/UFunPlayer
+make clean
+make -C MinHook -f build/MinGW/Makefile clean
+make
+```
+
 
 ### Offline Web Player installers
 
